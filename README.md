@@ -2,6 +2,8 @@
 
 > File-based multi-agent collaboration protocol for heterogeneous AI tools
 
+**[English](README.md)** | [한국어](docs/README.ko.md) | [日本語](docs/README.ja.md) | [中文](docs/README.zh.md)
+
 AgentHive lets multiple AI agents (Claude Code, Codex, Cursor, Copilot, ChatGPT, and others) collaborate on shared projects using a simple file-based protocol. No database, no server required — just YAML, JSONL, and Markdown files.
 
 ## Why AgentHive?
