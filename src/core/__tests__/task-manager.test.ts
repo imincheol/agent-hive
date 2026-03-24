@@ -118,7 +118,7 @@ describe("task lifecycle", () => {
       const result = await claimTask(projectHubPath, "TASK-001", "codex");
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain("cannot claim");
+      expect(result.message).toContain("invalid transition");
     });
 
     it("does not match shortened task IDs against TASK-010", async () => {
@@ -192,7 +192,7 @@ describe("task lifecycle", () => {
       const result = await completeTask(projectHubPath, "TASK-001", "nonsense" as any);
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain("Invalid status");
+      expect(result.message).toContain("Invalid transition");
     });
   });
 
@@ -214,6 +214,76 @@ describe("task lifecycle", () => {
       expect(tasks).toHaveLength(2);
       expect(tasks[0].id).toBe("TASK-001");
       expect(tasks[1].id).toBe("TASK-002");
+    });
+  });
+
+  describe("state machine transitions", () => {
+    it("allows backlog → doing (claim)", async () => {
+      await createTask(projectHubPath, { title: "SM test" });
+      const result = await claimTask(projectHubPath, "TASK-001", "claude-code");
+      expect(result.success).toBe(true);
+    });
+
+    it("allows doing → review", async () => {
+      await createTask(projectHubPath, { title: "SM review" });
+      await claimTask(projectHubPath, "TASK-001", "claude-code");
+      const result = await completeTask(projectHubPath, "TASK-001", "review");
+      expect(result.success).toBe(true);
+    });
+
+    it("allows doing → done", async () => {
+      await createTask(projectHubPath, { title: "SM done" });
+      await claimTask(projectHubPath, "TASK-001", "claude-code");
+      const result = await completeTask(projectHubPath, "TASK-001", "done");
+      expect(result.success).toBe(true);
+    });
+
+    it("allows doing → blocked", async () => {
+      await createTask(projectHubPath, { title: "SM blocked" });
+      await claimTask(projectHubPath, "TASK-001", "claude-code");
+      const result = await completeTask(projectHubPath, "TASK-001", "blocked");
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects done → doing", async () => {
+      await createTask(projectHubPath, { title: "SM no regress" });
+      await claimTask(projectHubPath, "TASK-001", "claude-code");
+      await completeTask(projectHubPath, "TASK-001", "done");
+      const result = await completeTask(projectHubPath, "TASK-001", "doing");
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("Invalid transition");
+    });
+
+    it("rejects backlog → done directly", async () => {
+      await createTask(projectHubPath, { title: "SM skip" });
+      const result = await completeTask(projectHubPath, "TASK-001", "done");
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("Invalid transition");
+    });
+
+    it("allows blocked → ready", async () => {
+      await createTask(projectHubPath, { title: "SM unblock" });
+      await claimTask(projectHubPath, "TASK-001", "claude-code");
+      await completeTask(projectHubPath, "TASK-001", "blocked");
+      const result = await completeTask(projectHubPath, "TASK-001", "ready");
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("createTask options", () => {
+    it("accepts tags, scopeFiles, and acceptance", async () => {
+      const result = await createTask(projectHubPath, {
+        title: "Options test",
+        tags: ["feat", "urgent"],
+        scopeFiles: ["src/index.ts"],
+        acceptance: ["Tests pass", "Docs updated"],
+      });
+
+      const raw = await readFile(join(result.taskDir, "task.yaml"), "utf-8");
+      const task = parse(raw);
+      expect(task.tags).toEqual(["feat", "urgent"]);
+      expect(task.scope.files).toEqual(["src/index.ts"]);
+      expect(task.acceptance).toEqual(["Tests pass", "Docs updated"]);
     });
   });
 });

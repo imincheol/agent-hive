@@ -6,6 +6,7 @@ import { DEFAULT_HUB_PATH, REGISTRY_FILE, PROJECTS_DIR, TASKS_DIR, BACKLOG_FILE 
 import { readYaml, writeYaml } from "./yaml-utils.js";
 import { slugFromPath } from "../utils/slug.js";
 import type { Registry, RegistryEntry } from "../models/registry.js";
+import { validateRegistry } from "../models/registry.js";
 import type { Project } from "../models/project.js";
 import { DEFAULT_PROJECT } from "../models/project.js";
 
@@ -31,7 +32,7 @@ export async function addProject(
 
   // Read existing registry
   const registryPath = join(hubPath, REGISTRY_FILE);
-  const registry = await readYaml<Registry>(registryPath);
+  const registry = await readYaml<Registry>(registryPath, validateRegistry);
 
   // Check for duplicate
   const existing = registry.projects.find(
@@ -103,6 +104,6 @@ export async function addProject(
 
 export async function listProjects(hubPath?: string): Promise<RegistryEntry[]> {
   const path = hubPath ?? DEFAULT_HUB_PATH;
-  const registry = await readYaml<Registry>(join(path, REGISTRY_FILE));
+  const registry = await readYaml<Registry>(join(path, REGISTRY_FILE), validateRegistry);
   return registry.projects;
 }

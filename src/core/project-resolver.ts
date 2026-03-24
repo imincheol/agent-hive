@@ -3,6 +3,7 @@ import { realpath } from "node:fs/promises";
 import { DEFAULT_HUB_PATH, REGISTRY_FILE, PROJECTS_DIR } from "./constants.js";
 import { readYaml } from "./yaml-utils.js";
 import type { Registry } from "../models/registry.js";
+import { validateRegistry } from "../models/registry.js";
 
 export interface ResolvedProject {
   slug: string;
@@ -28,7 +29,7 @@ export async function resolveProject(
   hubPath?: string,
 ): Promise<ResolvedProject | null> {
   const hub = hubPath ?? DEFAULT_HUB_PATH;
-  const registry = await readYaml<Registry>(join(hub, REGISTRY_FILE));
+  const registry = await readYaml<Registry>(join(hub, REGISTRY_FILE), validateRegistry);
   const realCwd = await canonicalize(cwd);
 
   // Collect all matches, then pick the longest (most specific) path
@@ -59,7 +60,7 @@ export async function resolveProjectBySlug(
   hubPath?: string,
 ): Promise<ResolvedProject | null> {
   const hub = hubPath ?? DEFAULT_HUB_PATH;
-  const registry = await readYaml<Registry>(join(hub, REGISTRY_FILE));
+  const registry = await readYaml<Registry>(join(hub, REGISTRY_FILE), validateRegistry);
 
   const entry = registry.projects.find((p) => p.slug === slug || p.name.toLowerCase() === slug.toLowerCase());
   if (!entry) return null;

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { resolveProject } from "../../core/project-resolver.js";
 import { createTask, claimTask, completeTask, listTasks } from "../../core/task-manager.js";
+import { requireHub } from "../utils.js";
 
 export const taskCommand = new Command("task")
   .description("Manage tasks in the current project");
@@ -10,9 +11,13 @@ taskCommand
   .description("Create a new task")
   .option("-c, --category <cat>", "Task category", "general")
   .option("-p, --priority <pri>", "Priority (critical, high, medium, low)", "medium")
+  .option("-t, --tags <tags>", "Comma-separated tags")
+  .option("--scope-files <files>", "Comma-separated scope files")
+  .option("--acceptance <items>", "Comma-separated acceptance criteria")
   .option("--by <agent>", "Created by", "human")
   .option("--hub-path <path>", "Custom hub path")
   .action(async (title: string, options) => {
+    requireHub(options.hubPath);
     const project = await resolveProject(process.cwd(), options.hubPath);
     if (!project) {
       console.error("✗ Not inside a registered project. Use: agenthive project add <path>");
@@ -24,6 +29,9 @@ taskCommand
       category: options.category,
       priority: options.priority,
       createdBy: options.by,
+      tags: options.tags ? options.tags.split(",").map((s: string) => s.trim()) : undefined,
+      scopeFiles: options.scopeFiles ? options.scopeFiles.split(",").map((s: string) => s.trim()) : undefined,
+      acceptance: options.acceptance ? options.acceptance.split(",").map((s: string) => s.trim()) : undefined,
     });
 
     console.log(`✓ Created ${result.id}: ${title}`);
@@ -37,6 +45,7 @@ taskCommand
   .option("-r, --role <role>", "Role (builder, planner, reviewer)", "builder")
   .option("--hub-path <path>", "Custom hub path")
   .action(async (id: string, options) => {
+    requireHub(options.hubPath);
     const project = await resolveProject(process.cwd(), options.hubPath);
     if (!project) {
       console.error("✗ Not inside a registered project.");
@@ -62,6 +71,7 @@ taskCommand
   .option("-s, --status <status>", "Target status (done, review)", "done")
   .option("--hub-path <path>", "Custom hub path")
   .action(async (id: string, options) => {
+    requireHub(options.hubPath);
     const project = await resolveProject(process.cwd(), options.hubPath);
     if (!project) {
       console.error("✗ Not inside a registered project.");
@@ -83,6 +93,7 @@ taskCommand
   .description("List tasks in current project")
   .option("--hub-path <path>", "Custom hub path")
   .action(async (options) => {
+    requireHub(options.hubPath);
     const project = await resolveProject(process.cwd(), options.hubPath);
     if (!project) {
       console.error("✗ Not inside a registered project.");

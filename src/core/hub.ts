@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { stringify } from "yaml";
 import { DEFAULT_HUB_PATH, CONFIG_FILE, REGISTRY_FILE, PROTOCOL_FILE, AGENTS_DIR } from "./constants.js";
 import type { HubConfig } from "../models/config.js";
-import { DEFAULT_CONFIG } from "../models/config.js";
+import { DEFAULT_CONFIG, validateConfig } from "../models/config.js";
 import { DEFAULT_REGISTRY } from "../models/registry.js";
 import { readYaml } from "./yaml-utils.js";
 
@@ -72,7 +72,7 @@ export async function initHub(options: InitOptions = {}): Promise<InitResult> {
   if (existing) {
     // Idempotent — verify existing hub is valid
     try {
-      const config = await readYaml<HubConfig>(join(hubPath, CONFIG_FILE));
+      const config = await readYaml<HubConfig>(join(hubPath, CONFIG_FILE), validateConfig);
       return {
         hubPath,
         created: false,
@@ -127,5 +127,5 @@ export function hubExists(hubPath?: string): boolean {
 
 export async function getHubConfig(hubPath?: string): Promise<HubConfig> {
   const path = hubPath ?? DEFAULT_HUB_PATH;
-  return readYaml<HubConfig>(join(path, CONFIG_FILE));
+  return readYaml<HubConfig>(join(path, CONFIG_FILE), validateConfig);
 }

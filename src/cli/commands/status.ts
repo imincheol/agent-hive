@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { resolveProject, resolveProjectBySlug } from "../../core/project-resolver.js";
 import { listTasks } from "../../core/task-manager.js";
+import { requireHub } from "../utils.js";
 import type { Task, TaskStatus } from "../../models/task.js";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
@@ -60,6 +61,7 @@ export const statusCommand = new Command("status")
   .argument("[project]", "Project name or slug (defaults to current directory)")
   .option("--hub-path <path>", "Custom hub path")
   .action(async (projectArg: string | undefined, options) => {
+    requireHub(options.hubPath);
     let project;
     if (projectArg) {
       project = await resolveProjectBySlug(projectArg, options.hubPath);

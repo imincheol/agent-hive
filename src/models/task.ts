@@ -10,6 +10,24 @@ export const TASK_STATUSES: TaskStatus[] = ["backlog", "ready", "doing", "review
 export const WORKFLOW_MODES: WorkflowMode[] = ["conference", "pipeline", "kanban"];
 export const AGENT_ROLES: AgentRole[] = ["planner", "builder", "reviewer", "arbiter"];
 
+/**
+ * Valid state transitions for the task lifecycle.
+ * backlog → ready → doing → review → done
+ * Any active state can go to blocked, and blocked can return to ready.
+ */
+export const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  backlog: ["ready", "doing", "blocked"],
+  ready: ["doing", "blocked"],
+  doing: ["review", "done", "blocked", "ready"],
+  review: ["done", "doing", "blocked"],
+  done: [],
+  blocked: ["ready", "backlog"],
+};
+
+export function isValidTransition(from: TaskStatus, to: TaskStatus): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
 export interface TaskScope {
   path: string;
   files: string[];

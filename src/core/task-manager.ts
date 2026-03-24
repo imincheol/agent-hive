@@ -6,6 +6,7 @@ import { TASKS_DIR, TASK_YAML, LOCK_YAML, PLAN_MD, SUMMARY_MD } from "./constant
 import { readYaml, writeYaml } from "./yaml-utils.js";
 import { regenerateBacklog } from "./backlog.js";
 import type { Task, TaskStatus } from "../models/task.js";
+import { validateTask, isValidTransition } from "../models/task.js";
 import type { Lock } from "../models/lock.js";
 
 function slugify(title: string): string {
@@ -24,6 +25,8 @@ export interface CreateTaskOptions {
   createdBy?: string;
   scopePath?: string;
   scopeFiles?: string[];
+  tags?: string[];
+  acceptance?: string[];
 }
 
 export interface CreateTaskResult {
@@ -70,7 +73,7 @@ export async function createTask(
     id,
     title: options.title,
     category: options.category ?? "general",
-    tags: [],
+    tags: options.tags ?? [],
     workflow_mode: (options.workflowMode as Task["workflow_mode"]) ?? "pipeline",
     status: "backlog",
     priority: (options.priority as Task["priority"]) ?? "medium",
@@ -83,12 +86,12 @@ export async function createTask(
       files: options.scopeFiles ?? [],
       not_touch: [],
     },
-    acceptance: [],
+    acceptance: options.acceptance ?? [],
     branch: null,
     handoff: { next_role: "reviewer", next_agent: null },
   };
 
-  await writeYaml(join(taskDir, TASK_YAML), task);
+  await writeYaml(join(taskDir, TASK_YAML), task, validateTask);
 
   await writeFile(
     join(taskDir, PLAN_MD),
@@ -123,7 +126,7 @@ export async function claimTask(
   }
 
   // Read task
-  const task = await readYaml<Task>(join(taskDir, TASK_YAML));
+  const task = await readYaml<Task>(join(taskDir, TASK_YAML), validateTask);
 
   // Check if already locked — use atomic creation
   const lockPath = join(taskDir, LOCK_YAML);
@@ -145,11 +148,11 @@ export async function claimTask(
     }
   }
 
-  // Check status — only backlog or ready can be claimed
-  if (task.status !== "backlog" && task.status !== "ready") {
+  // Check status — only valid transitions to 'doing' are allowed
+  if (!isValidTransition(task.status, "doing")) {
     return {
       success: false,
-      message: `Task ${taskId} is in '${task.status}' status, cannot claim`,
+      message: `Task ${taskId}: invalid transition '${task.status}' → 'doing'`,
       warnings,
     };
   }
@@ -234,7 +237,7 @@ export async function claimTask(
   task.status = "doing";
   task.owner = agent;
   task.role = role as Task["role"];
-  await writeYaml(join(taskDir, TASK_YAML), task);
+  await writeYaml(join(taskDir, TASK_YAML), task, validateTask);
 
   await regenerateBacklog(hubProjectPath);
 
@@ -245,34 +248,34 @@ export async function claimTask(
   };
 }
 
-const VALID_COMPLETION_STATUSES: TaskStatus[] = ["done", "review", "blocked", "ready"];
-
 export async function completeTask(
   hubProjectPath: string,
   taskId: string,
   targetStatus: TaskStatus = "done",
 ): Promise<{ success: boolean; message: string }> {
-  if (!VALID_COMPLETION_STATUSES.includes(targetStatus)) {
-    return {
-      success: false,
-      message: `Invalid status "${targetStatus}". Must be one of: ${VALID_COMPLETION_STATUSES.join(", ")}`,
-    };
-  }
-
   const tasksDir = join(hubProjectPath, TASKS_DIR);
   const taskDir = await findTaskDir(tasksDir, taskId);
   if (!taskDir) {
     return { success: false, message: `Task ${taskId} not found` };
   }
 
-  const task = await readYaml<Task>(join(taskDir, TASK_YAML));
+  const task = await readYaml<Task>(join(taskDir, TASK_YAML), validateTask);
+
+  // Enforce state machine transitions
+  if (!isValidTransition(task.status, targetStatus)) {
+    return {
+      success: false,
+      message: `Invalid transition: '${task.status}' → '${targetStatus}'`,
+    };
+  }
+
   task.status = targetStatus;
   // Clear owner/role on terminal states
   if (targetStatus === "done" || targetStatus === "blocked" || targetStatus === "ready") {
     task.owner = null;
     task.role = null;
   }
-  await writeYaml(join(taskDir, TASK_YAML), task);
+  await writeYaml(join(taskDir, TASK_YAML), task, validateTask);
 
   // Remove lock when leaving 'doing' state
   const lockPath = join(taskDir, LOCK_YAML);
@@ -297,7 +300,7 @@ export async function listTasks(
   for (const item of items) {
     if (!item.isDirectory() || !item.name.startsWith("TASK-")) continue;
     try {
-      const task = await readYaml<Task>(join(tasksDir, item.name, TASK_YAML));
+      const task = await readYaml<Task>(join(tasksDir, item.name, TASK_YAML), validateTask);
       tasks.push(task);
     } catch {
       // Skip invalid
@@ -333,7 +336,7 @@ async function getActiveTasks(tasksDir: string, excludeId: string): Promise<Task
     const lockPath = join(tasksDir, item.name, LOCK_YAML);
     if (existsSync(lockPath)) {
       try {
-        const task = await readYaml<Task>(join(tasksDir, item.name, TASK_YAML));
+        const task = await readYaml<Task>(join(tasksDir, item.name, TASK_YAML), validateTask);
         tasks.push(task);
       } catch {
         // Skip

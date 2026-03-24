@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolveProject } from "../../core/project-resolver.js";
 import { getHubConfig } from "../../core/hub.js";
+import { requireHub } from "../utils.js";
 import { readYaml } from "../../core/yaml-utils.js";
 import { join, dirname } from "node:path";
 import { generatePointerFiles, AGENT_TARGETS } from "../../generators/pointer.js";
@@ -33,6 +34,7 @@ export const setupCommand = new Command("setup")
   .argument("<target>", `Agent target: ${AGENT_TARGETS.join(", ")}, or "all"`)
   .option("--hub-path <path>", "Custom hub path")
   .action(async (target: string, options) => {
+    requireHub(options.hubPath);
     const validTargets = [...AGENT_TARGETS, "all"];
     if (!validTargets.includes(target)) {
       console.error(`✗ Unknown target: ${target}. Use: ${validTargets.join(", ")}`);
